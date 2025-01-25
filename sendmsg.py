@@ -6,7 +6,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 
 token = input("トークンを入力してください: ")
 
-async def send_to_all_groups():
+async def send():
     group_ids = []
     with open("id.txt", "r", encoding="utf-8") as f:
         for line in f:
@@ -84,4 +84,4 @@ async def send_to_all_groups():
 
         logging.info("全てのグループへの処理が完了しました。")
 
-asyncio.run(send_to_all_groups())
+asyncio.run(send())
