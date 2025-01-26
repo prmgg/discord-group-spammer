@@ -2,10 +2,32 @@ import aiohttp
 import asyncio
 import json
 
-async def send_request(session, url, headers, data):
-    async with session.post(url, headers=headers, json=data) as response:
-        resp_json = await response.json()
-        return resp_json
+async def send_request(session, url, headers, data, max_retries=3):
+    for attempt in range(1, max_retries + 1):
+        try:
+            async with session.post(url, headers=headers, json=data) as response:
+                if response.status == 429:
+                    error_data = await response.json()
+                    retry_after = error_data.get("retry_after", 3)
+                    print(f"[WARN] 429 Rate Limit. {retry_after}秒待機して再試行します... (試行 {attempt}/{max_retries})")
+                    await asyncio.sleep(retry_after)
+                    continue
+                
+                if response.status < 200 or response.status >= 300:
+                    await asyncio.sleep(1)
+                    continue
+
+                resp_json = await response.json()
+                return resp_json
+
+        except Exception as e:
+            print(f"[ERROR] 送信中にエラーが発生しました: {e} (試行 {attempt}/{max_retries})")
+            await asyncio.sleep(5)
+            continue
+    
+    print("[ERROR] 最大リトライ回数に到達しましたが、成功しませんでした。")
+    return None
+
 
 async def main():
     token = input("トークンを入力してください: ")
@@ -36,13 +58,13 @@ async def main():
 
     async with aiohttp.ClientSession() as session:
         for _ in range(num_requests):
-            response = await send_request(session, url, headers, data)
-            if 'id' in response:
-                with open("id.txt", "a") as file:
+            response = await send_request(session, url, headers, data, max_retries=3)
+            if response and 'id' in response:
+                with open("id.txt", "a", encoding="utf-8") as file:
                     file.write(response['id'] + "\n")
-                print(f"ID: {response['id']}")
+                print(f"グループ DM 作成に成功しました。ID: {response['id']}")
             else:
-                print("IDが含まれていません。")
+                print("グループ DM 作成に失敗しました。IDが含まれていません。")
 
 if __name__ == "__main__":
     asyncio.run(main())
